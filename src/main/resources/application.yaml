@@ -1,4 +1,7 @@
 spring:
+  config:
+      import: optional:file:.env[.properties]
+
   application:
     name: wallet-service
   
@@ -14,3 +17,9 @@ spring:
   
 server:
   port: ${SERVER_PORT}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
