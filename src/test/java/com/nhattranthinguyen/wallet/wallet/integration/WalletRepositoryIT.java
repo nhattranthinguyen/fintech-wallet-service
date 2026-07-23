@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import com.nhattranthinguyen.wallet.support.PostgresIT;
 import com.nhattranthinguyen.wallet.wallet.domain.Wallet;
@@ -18,7 +17,6 @@ import com.nhattranthinguyen.wallet.wallet.infrastructure.WalletRepository;
 import jakarta.persistence.EntityManager;
 
 @DataJpaTest
-@Testcontainers
 class WalletRepositoryIT extends PostgresIT {
     @Autowired
     private WalletRepository walletRepository;
