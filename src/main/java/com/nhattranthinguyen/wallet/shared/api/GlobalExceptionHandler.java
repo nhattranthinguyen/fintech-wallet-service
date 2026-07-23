@@ -40,20 +40,47 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleValidation(
         MethodArgumentNotValidException exception
     ) {
-        String message = exception.getBindingResult()
+        Map<String, String> errors = new LinkedHashMap<>();
+
+        exception.getBindingResult()
             .getFieldErrors()
             .stream()
-            .findFirst()
-            .map(fieldError ->
-                fieldError.getField() + ": " +
+            .sorted((left, right) -> Integer.compare(
+                validationPriority(left.getCode()),
+                validationPriority(right.getCode())
+            ))
+            .forEach(fieldError -> errors.putIfAbsent(
+                fieldError.getField(),
                 fieldError.getDefaultMessage()
-            )
-            .orElse("Invalid request");
+            ));
 
-        return error(HttpStatus.BAD_REQUEST, message);
+        Map<String, Object> body = errorBody(
+            HttpStatus.BAD_REQUEST,
+            "Validation failed"
+        );
+        body.put("errors", errors);
+
+        return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Map<String, Object>> handleUnexpectedException() {
+        return error(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "An unexpected error occurred"
+        );
     }
 
     private ResponseEntity<Map<String, Object>> error(
+        HttpStatus status,
+        String message
+    ) {
+        return ResponseEntity
+            .status(status)
+            .body(errorBody(status, message));
+    }
+
+    private Map<String, Object> errorBody(
         HttpStatus status,
         String message
     ) {
@@ -63,6 +90,13 @@ public class GlobalExceptionHandler {
         body.put("error", status.getReasonPhrase());
         body.put("message", message);
 
-        return ResponseEntity.status(status).body(body);
+        return body;
+    }
+
+    private int validationPriority(String validationCode) {
+        return switch (validationCode) {
+            case "NotNull", "NotBlank", "NotEmpty" -> 0;
+            default -> 1;
+        };
     }
 }
