@@ -11,6 +11,9 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.nhattranthinguyen.wallet.transfer.application.exception.CurrencyMismatchException;
+import com.nhattranthinguyen.wallet.transfer.application.exception.SameWalletTransferException;
+import com.nhattranthinguyen.wallet.wallet.application.exception.InsufficientBalanceException;
 import com.nhattranthinguyen.wallet.wallet.application.exception.WalletAlreadyExistsException;
 import com.nhattranthinguyen.wallet.wallet.application.exception.WalletNotFoundException;
 
@@ -29,6 +32,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(WalletAlreadyExistsException.class)
     public ResponseEntity<Map<String, Object>> handleWalletAlreadyExists(
         WalletAlreadyExistsException exception
+    ) {
+        return error(
+            HttpStatus.CONFLICT,
+            exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler({
+        InsufficientBalanceException.class,
+        CurrencyMismatchException.class,
+        SameWalletTransferException.class
+    })
+    public ResponseEntity<Map<String, Object>> handleTransferConflict(
+        RuntimeException exception
     ) {
         return error(
             HttpStatus.CONFLICT,
