@@ -8,6 +8,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import com.nhattranthinguyen.wallet.wallet.application.exception.InsufficientBalanceException;
+
 class WalletTest {
     @Test
     void shouldCreateWalletWithInitialValues() {
@@ -71,5 +73,74 @@ class WalletTest {
         )
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("3");
+    }
+
+    @Test
+    void shouldCreditWallet() {
+        Wallet wallet = Wallet.create(UUID.randomUUID(), "USD");
+
+        wallet.credit(new BigDecimal("25.0000"));
+
+        assertThat(wallet.getBalance())
+                .isEqualByComparingTo("25.0000");
+    }
+
+    @Test
+    void shouldThrowWhenCreditingZero() {
+        Wallet wallet = Wallet.create(UUID.randomUUID(), "USD");
+
+        assertThatThrownBy(() ->
+                wallet.credit(BigDecimal.ZERO))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldThrowWhenCreditingNegativeAmount() {
+        Wallet wallet = Wallet.create(UUID.randomUUID(), "USD");
+
+        assertThatThrownBy(() ->
+                wallet.credit(new BigDecimal("-1")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldDebitWallet() {
+        Wallet wallet = Wallet.create(UUID.randomUUID(), "USD");
+
+        wallet.credit(new BigDecimal("100.0000"));
+
+        wallet.debit(new BigDecimal("35.0000"));
+
+        assertThat(wallet.getBalance())
+                .isEqualByComparingTo("65.0000");
+    }
+
+    @Test
+    void shouldThrowWhenDebitingZero() {
+        Wallet wallet = Wallet.create(UUID.randomUUID(), "USD");
+
+        assertThatThrownBy(() ->
+                wallet.debit(BigDecimal.ZERO))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldThrowWhenDebitingNegativeAmount() {
+        Wallet wallet = Wallet.create(UUID.randomUUID(), "USD");
+
+        assertThatThrownBy(() ->
+                wallet.debit(new BigDecimal("-5")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldThrowWhenDebitingMoreThanBalance() {
+        Wallet wallet = Wallet.create(UUID.randomUUID(), "USD");
+
+        wallet.credit(new BigDecimal("10.0000"));
+
+        assertThatThrownBy(() ->
+                wallet.debit(new BigDecimal("20.0000")))
+                .isInstanceOf(InsufficientBalanceException.class);
     }
 }

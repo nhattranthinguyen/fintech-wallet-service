@@ -5,6 +5,8 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.UUID;
 
+import com.nhattranthinguyen.wallet.wallet.application.exception.InsufficientBalanceException;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -78,6 +80,30 @@ public class Wallet {
             ownerId,
             normalizedCurrency
         );
+    }
+
+    public void debit(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException(
+                "Debit amount must be greater than zero."
+            );
+        }
+
+        if (balance.compareTo(amount) < 0) {
+            throw new InsufficientBalanceException();
+        }
+
+        balance = balance.subtract(amount);
+    }
+
+    public void credit(BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            throw new IllegalArgumentException(
+                "Credit amount must be greater than zero."
+            );
+        }
+
+        balance = balance.add(amount);
     }
 
     public UUID getId() {
