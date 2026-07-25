@@ -1,0 +1,8 @@
+.git
+.github
+.agents
+.vscode
+.env
+target
+*.log
+README.md
