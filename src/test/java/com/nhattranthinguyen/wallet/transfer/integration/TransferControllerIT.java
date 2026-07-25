@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -24,6 +25,7 @@ import com.nhattranthinguyen.wallet.support.PostgresIT;
 import com.nhattranthinguyen.wallet.transfer.api.TransferRequest;
 import com.nhattranthinguyen.wallet.transfer.domain.Transfer;
 import com.nhattranthinguyen.wallet.transfer.infrastructure.TransferRepository;
+import com.nhattranthinguyen.wallet.transfer.infrastructure.IdempotencyKeyRepository;
 import com.nhattranthinguyen.wallet.wallet.domain.Wallet;
 import com.nhattranthinguyen.wallet.wallet.infrastructure.WalletRepository;
 
@@ -46,6 +48,17 @@ public class TransferControllerIT extends PostgresIT {
 
     @Autowired
     private LedgerEntryRepository ledgerEntryRepository;
+
+    @Autowired
+    private IdempotencyKeyRepository idempotencyKeyRepository;
+
+    @BeforeEach
+    void cleanDatabase() {
+        idempotencyKeyRepository.deleteAll();
+        ledgerEntryRepository.deleteAll();
+        transferRepository.deleteAll();
+        walletRepository.deleteAll();
+    }
 
     @Test
     void shouldCreateTransferSuccessfully() throws Exception {
@@ -107,6 +120,39 @@ public class TransferControllerIT extends PostgresIT {
 
         assertThat(updatedDestination.getBalance())
                 .isEqualByComparingTo("25.00");
+    }
+
+    @Test
+    void shouldReturnExistingTransferForRepeatedIdempotencyKey() throws Exception {
+        Wallet source = Wallet.create(UUID.randomUUID(), "USD");
+        source.credit(new BigDecimal("100.00"));
+        Wallet destination = Wallet.create(UUID.randomUUID(), "USD");
+        walletRepository.saveAll(List.of(source, destination));
+
+        TransferRequest request = new TransferRequest(
+                source.getId(), destination.getId(), new BigDecimal("25.00"));
+        String body = objectMapper.writeValueAsString(request);
+
+        String firstResponse = mockMvc.perform(post("/api/v1/transfers")
+                        .header("Idempotency-Key", "transfer-123")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        String secondResponse = mockMvc.perform(post("/api/v1/transfers")
+                        .header("Idempotency-Key", "transfer-123")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(objectMapper.readTree(secondResponse).get("id").asText())
+                .isEqualTo(objectMapper.readTree(firstResponse).get("id").asText());
+        assertThat(transferRepository.count()).isEqualTo(1);
+        assertThat(ledgerEntryRepository.count()).isEqualTo(2);
+        assertThat(walletRepository.findById(source.getId()).orElseThrow().getBalance())
+                .isEqualByComparingTo("75.00");
     }
 
     @Test
