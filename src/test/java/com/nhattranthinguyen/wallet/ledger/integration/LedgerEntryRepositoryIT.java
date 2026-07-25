@@ -3,6 +3,9 @@ package com.nhattranthinguyen.wallet.ledger.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -67,6 +70,57 @@ class LedgerEntryRepositoryIT extends PostgresIT {
 
         assertThat(found.getCreatedAt())
                 .isNotNull();
+    }
+
+    @Test
+    void shouldReturnOnlyEntriesForRequestedWallet() {
+        Wallet requestedWallet = persistWallet();
+        Wallet otherWallet = persistWallet();
+
+        LedgerEntry requestedEntry = entryAt(
+                requestedWallet.getId(), "10.0000", 1);
+        LedgerEntry otherEntry = entryAt(
+                otherWallet.getId(), "20.0000", 2);
+        ledgerEntryRepository.saveAllAndFlush(List.of(requestedEntry, otherEntry));
+
+        entityManager.clear();
+
+        List<LedgerEntry> result = ledgerEntryRepository
+                .findByWalletIdOrderByCreatedAtDesc(requestedWallet.getId());
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId())
+                .isEqualTo(requestedEntry.getId());
+    }
+
+    @Test
+    void shouldReturnWalletEntriesNewestFirst() {
+        Wallet wallet = persistWallet();
+        LedgerEntry oldest = entryAt(wallet.getId(), "10.0000", 1);
+        LedgerEntry newest = entryAt(wallet.getId(), "30.0000", 3);
+        LedgerEntry middle = entryAt(wallet.getId(), "20.0000", 2);
+        ledgerEntryRepository.saveAllAndFlush(List.of(oldest, newest, middle));
+
+        entityManager.clear();
+
+        List<LedgerEntry> result = ledgerEntryRepository
+                .findByWalletIdOrderByCreatedAtDesc(wallet.getId());
+
+        assertThat(result).hasSize(3);
+        assertThat(result.get(0).getId()).isEqualTo(newest.getId());
+        assertThat(result.get(1).getId()).isEqualTo(middle.getId());
+        assertThat(result.get(2).getId()).isEqualTo(oldest.getId());
+    }
+
+    private LedgerEntry entryAt(UUID walletId, String amount, int hour) {
+        BigDecimal value = new BigDecimal(amount);
+        return LedgerEntry.createAt(
+                walletId,
+                null,
+                LedgerEntryType.CREDIT,
+                value,
+                value,
+                OffsetDateTime.of(2026, 7, 25, hour, 0, 0, 0, ZoneOffset.UTC));
     }
 
     private Wallet persistWallet() {

@@ -3,6 +3,7 @@ package com.nhattranthinguyen.wallet.transfer.integration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -120,6 +121,13 @@ public class TransferControllerIT extends PostgresIT {
 
         assertThat(updatedDestination.getBalance())
                 .isEqualByComparingTo("25.00");
+
+        mockMvc.perform(get("/api/v1/wallets/{walletId}/transactions", source.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].transferId").value(transfer.getId().toString()))
+                .andExpect(jsonPath("$[0].type").value("DEBIT"))
+                .andExpect(jsonPath("$[0].amount").value(25.00))
+                .andExpect(jsonPath("$[0].balanceAfter").value(75.00));
     }
 
     @Test
