@@ -22,6 +22,7 @@ import com.nhattranthinguyen.wallet.transfer.application.exception.CurrencyMisma
 import com.nhattranthinguyen.wallet.transfer.application.exception.SameWalletTransferException;
 import com.nhattranthinguyen.wallet.transfer.domain.Transfer;
 import com.nhattranthinguyen.wallet.transfer.infrastructure.TransferRepository;
+import com.nhattranthinguyen.wallet.transfer.infrastructure.IdempotencyKeyRepository;
 import com.nhattranthinguyen.wallet.wallet.application.exception.InsufficientBalanceException;
 import com.nhattranthinguyen.wallet.wallet.application.exception.InvalidTransferAmountException;
 import com.nhattranthinguyen.wallet.wallet.application.exception.WalletNotFoundException;
@@ -39,6 +40,9 @@ public class TransferServiceTest {
     @Mock
     private LedgerEntryRepository ledgerEntryRepository;
 
+    @Mock
+    private IdempotencyKeyRepository idempotencyKeyRepository;
+
     @InjectMocks
     private TransferService transferService;
 
@@ -49,10 +53,10 @@ public class TransferServiceTest {
 
         source.credit(new BigDecimal("100.00"));
 
-        when(walletRepository.findById(source.getId()))
+        when(walletRepository.findByIdForUpdate(source.getId()))
                 .thenReturn(Optional.of(source));
 
-        when(walletRepository.findById(destination.getId()))
+        when(walletRepository.findByIdForUpdate(destination.getId()))
                 .thenReturn(Optional.of(destination));
 
         when(transferRepository.save(any(Transfer.class)))
@@ -123,8 +127,10 @@ public class TransferServiceTest {
         UUID sourceId = UUID.randomUUID();
         UUID destinationId = UUID.randomUUID();
 
-        when(walletRepository.findById(sourceId))
-                .thenReturn(Optional.empty());
+        when(walletRepository.findByIdForUpdate(any(UUID.class)))
+                .thenAnswer(invocation -> invocation.<UUID>getArgument(0).equals(sourceId)
+                        ? Optional.empty()
+                        : Optional.of(Wallet.create(UUID.randomUUID(), "USD")));
 
         TransferCommand command = new TransferCommand(
                 sourceId,
@@ -141,13 +147,12 @@ public class TransferServiceTest {
     void shouldThrowWhenDestinationWalletDoesNotExist() {
         Wallet source = Wallet.create(UUID.randomUUID(), "USD");
 
-        when(walletRepository.findById(source.getId()))
-                .thenReturn(Optional.of(source));
-
         UUID destinationId = UUID.randomUUID();
 
-        when(walletRepository.findById(destinationId))
-                .thenReturn(Optional.empty());
+        when(walletRepository.findByIdForUpdate(any(UUID.class)))
+                .thenAnswer(invocation -> invocation.<UUID>getArgument(0).equals(source.getId())
+                        ? Optional.of(source)
+                        : Optional.empty());
 
         TransferCommand command = new TransferCommand(
                 source.getId(),
@@ -167,10 +172,10 @@ public class TransferServiceTest {
 
         source.credit(new BigDecimal("100"));
 
-        when(walletRepository.findById(source.getId()))
+        when(walletRepository.findByIdForUpdate(source.getId()))
                 .thenReturn(Optional.of(source));
 
-        when(walletRepository.findById(destination.getId()))
+        when(walletRepository.findByIdForUpdate(destination.getId()))
                 .thenReturn(Optional.of(destination));
 
         TransferCommand command = new TransferCommand(
@@ -191,10 +196,10 @@ public class TransferServiceTest {
 
         source.credit(new BigDecimal("10"));
 
-        when(walletRepository.findById(source.getId()))
+        when(walletRepository.findByIdForUpdate(source.getId()))
                 .thenReturn(Optional.of(source));
 
-        when(walletRepository.findById(destination.getId()))
+        when(walletRepository.findByIdForUpdate(destination.getId()))
                 .thenReturn(Optional.of(destination));
 
         TransferCommand command = new TransferCommand(

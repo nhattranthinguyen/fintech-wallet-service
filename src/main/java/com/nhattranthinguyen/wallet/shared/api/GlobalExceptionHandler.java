@@ -2,7 +2,6 @@ package com.nhattranthinguyen.wallet.shared.api;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -12,6 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import com.nhattranthinguyen.wallet.transfer.application.exception.CurrencyMismatchException;
+import com.nhattranthinguyen.wallet.transfer.application.exception.IdempotencyConflictException;
 import com.nhattranthinguyen.wallet.transfer.application.exception.SameWalletTransferException;
 import com.nhattranthinguyen.wallet.wallet.application.exception.InsufficientBalanceException;
 import com.nhattranthinguyen.wallet.wallet.application.exception.WalletAlreadyExistsException;
@@ -20,7 +20,7 @@ import com.nhattranthinguyen.wallet.wallet.application.exception.WalletNotFoundE
 @RestControllerAdvice
 public class GlobalExceptionHandler {
     @ExceptionHandler(WalletNotFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleWalletNotFound(
+    public ResponseEntity<ApiErrorResponse> handleWalletNotFound(
         WalletNotFoundException exception
     ) {
         return error(
@@ -30,7 +30,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(WalletAlreadyExistsException.class)
-    public ResponseEntity<Map<String, Object>> handleWalletAlreadyExists(
+    public ResponseEntity<ApiErrorResponse> handleWalletAlreadyExists(
         WalletAlreadyExistsException exception
     ) {
         return error(
@@ -42,9 +42,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
         InsufficientBalanceException.class,
         CurrencyMismatchException.class,
-        SameWalletTransferException.class
+        SameWalletTransferException.class,
+        IdempotencyConflictException.class
     })
-    public ResponseEntity<Map<String, Object>> handleTransferConflict(
+    public ResponseEntity<ApiErrorResponse> handleTransferConflict(
         RuntimeException exception
     ) {
         return error(
@@ -54,10 +55,10 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(
+    public ResponseEntity<ApiErrorResponse> handleValidation(
         MethodArgumentNotValidException exception
     ) {
-        Map<String, String> errors = new LinkedHashMap<>();
+        Map<String, String> errors = new java.util.LinkedHashMap<>();
 
         exception.getBindingResult()
             .getFieldErrors()
@@ -71,43 +72,44 @@ public class GlobalExceptionHandler {
                 fieldError.getDefaultMessage()
             ));
 
-        Map<String, Object> body = errorBody(
-            HttpStatus.BAD_REQUEST,
-            "Validation failed"
-        );
-        body.put("errors", errors);
+        return ResponseEntity.badRequest().body(errorBody(
+            HttpStatus.BAD_REQUEST, "Validation failed", errors));
+    }
 
-        return ResponseEntity.badRequest().body(body);
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException exception) {
+        return error(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleUnexpectedException() {
+    public ResponseEntity<ApiErrorResponse> handleUnexpectedException() {
         return error(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "An unexpected error occurred"
         );
     }
 
-    private ResponseEntity<Map<String, Object>> error(
+    private ResponseEntity<ApiErrorResponse> error(
         HttpStatus status,
         String message
     ) {
         return ResponseEntity
             .status(status)
-            .body(errorBody(status, message));
+            .body(errorBody(status, message, null));
     }
 
-    private Map<String, Object> errorBody(
+    private ApiErrorResponse errorBody(
         HttpStatus status,
-        String message
+        String message,
+        Map<String, String> errors
     ) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", OffsetDateTime.now(ZoneOffset.UTC));
-        body.put("status", status.value());
-        body.put("error", status.getReasonPhrase());
-        body.put("message", message);
-
-        return body;
+        return new ApiErrorResponse(
+            OffsetDateTime.now(ZoneOffset.UTC),
+            status.value(),
+            status.getReasonPhrase(),
+            message,
+            errors
+        );
     }
 
     private int validationPriority(String validationCode) {

@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nhattranthinguyen.wallet.transfer.application.TransferCommand;
@@ -41,13 +42,14 @@ public class TransferController {
             @ApiResponse(responseCode = "409", description = "Insufficient balance, currency mismatch, or identical wallets", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
     })
     public ResponseEntity<TransferResponse> createTransfer(
-            @Valid @RequestBody TransferRequest request) {
+            @Valid @RequestBody TransferRequest request,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
         TransferCommand command = new TransferCommand(
                 request.sourceWalletId(),
                 request.destinationWalletId(),
                 request.amount());
 
-        Transfer transfer = transferService.execute(command);
+        Transfer transfer = transferService.execute(command, idempotencyKey);
 
         TransferResponse response = TransferResponse.from(transfer);
 
