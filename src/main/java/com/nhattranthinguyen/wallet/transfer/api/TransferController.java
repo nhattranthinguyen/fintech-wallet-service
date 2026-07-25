@@ -17,6 +17,7 @@ import com.nhattranthinguyen.wallet.shared.api.ApiErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -34,7 +35,19 @@ public class TransferController {
     }
 
     @PostMapping
-    @Operation(summary = "Create a transfer", description = "Atomically debits the source wallet, credits the destination wallet, and records ledger entries.")
+    @Operation(
+            summary = "Create a transfer",
+            description = "Atomically debits the source wallet, credits the destination wallet, and records ledger entries.",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(examples = @ExampleObject(
+                            name = "USD transfer",
+                            value = """
+                                    {
+                                      "sourceWalletId": "11111111-1111-1111-1111-111111111111",
+                                      "destinationWalletId": "33333333-3333-3333-3333-333333333333",
+                                      "amount": 25.0000
+                                    }
+                                    """))))
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Transfer completed", headers = @Header(name = "Location", description = "URI of the created transfer"), content = @Content(schema = @Schema(implementation = TransferResponse.class))),
             @ApiResponse(responseCode = "400", description = "Request validation failed", content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),

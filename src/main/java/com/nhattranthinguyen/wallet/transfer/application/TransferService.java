@@ -8,6 +8,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,8 @@ import com.nhattranthinguyen.wallet.wallet.infrastructure.WalletRepository;
 
 @Service
 public class TransferService {
+    private static final Logger log = LoggerFactory.getLogger(TransferService.class);
+
     private final WalletRepository walletRepository;
     private final TransferRepository transferRepository;
     private final LedgerEntryRepository ledgerEntryRepository;
@@ -72,10 +76,18 @@ public class TransferService {
         if (existingKey.isPresent()) {
             IdempotencyKey storedKey = existingKey.get();
             if (!storedKey.getRequestHash().equals(requestHash)) {
+                log.atWarn()
+                        .addKeyValue("requestHash", requestHash)
+                        .log("Transfer idempotency conflict");
                 throw new IdempotencyConflictException();
             }
-            return transferRepository.findById(storedKey.getResourceId())
+            Transfer existingTransfer = transferRepository.findById(storedKey.getResourceId())
                     .orElseThrow(() -> new IllegalStateException("Idempotent transfer result is missing."));
+            log.atInfo()
+                    .addKeyValue("transferId", existingTransfer.getId())
+                    .addKeyValue("requestHash", requestHash)
+                    .log("Returning idempotent transfer result");
+            return existingTransfer;
         }
 
         Transfer transfer = executeTransfer(command);
@@ -129,6 +141,14 @@ public class TransferService {
 
         ledgerEntryRepository.saveAll(
                 List.of(debitEntry, creditEntry));
+
+        log.atInfo()
+                .addKeyValue("transferId", transfer.getId())
+                .addKeyValue("sourceWalletId", sourceWallet.getId())
+                .addKeyValue("destinationWalletId", destinationWallet.getId())
+                .addKeyValue("amount", command.amount())
+                .addKeyValue("currency", sourceWallet.getCurrency())
+                .log("Transfer completed");
 
         return transfer;
     }
